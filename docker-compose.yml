@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  app:
+    build: 
+      context: .
+      dockerfile: C:\Users\user\Desktop\premium_cars_app\Dockerfile
+    depends_on:
+      - db
+      - redis
+    environment:
+      DB_HOST: localhost
+      DB_PORT: 5433
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: premiumcars
+      REDIS_ADDR: redis:6379
+    ports:
+      - "8080:8080"
+    networks:
+      - backend
+
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: premiumcars
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - backend
+
+  redis:
+    image: redis:7
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - backend
+
+volumes:
+  pgdata:
+
+networks:
+  backend:

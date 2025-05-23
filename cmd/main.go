@@ -1,20 +1,33 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"premium_cars_app/internal/auth"
 	"premium_cars_app/pkg/models"
 	"premium_cars_app/pkg/utils"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/driver/sqlite"
+	"github.com/joho/godotenv"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
 func main() {
-	db, err := gorm.Open(sqlite.Open("test.db"), &gorm.Config{})
+	_ = godotenv.Load()
+
+	dsn := fmt.Sprintf(
+		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
+		"localhost",
+		"postgres",
+		"postgres",
+		"premiumcars",
+		"5433",
+	)
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		panic("failed to connect database")
+		panic("failed to connect to PostgreSQL")
 	}
 
 	db.AutoMigrate(&models.User{})
