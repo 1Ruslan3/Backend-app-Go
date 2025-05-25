@@ -51,8 +51,8 @@ func main() {
 	handler := &handlers.RequestHandler{Queue: q}
 
 	rr := mux.NewRouter()
-	rr.Use(mockAuthMiddleware)    // симулируем userID
-	rr.Use(requestTimeMiddleware) // время создания заявки
+	rr.Use(mockAuthMiddleware)
+	rr.Use(requestTimeMiddleware)
 	rr.HandleFunc("/requests", handler.CreateRequest).Methods("POST")
 	rr.HandleFunc("/requests/{id}/status", handler.GetRequestStatus).Methods("GET")
 
@@ -66,7 +66,7 @@ func main() {
 	})
 
 	r.Use(func(c *gin.Context) {
-		c.Set("userID", "user-123") // или вытащить из токена
+		c.Set("userID", "user-123")
 		c.Set("requestTime", time.Now().Format(time.RFC3339))
 		c.Next()
 	})
