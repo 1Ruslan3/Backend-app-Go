@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"time"
 
+	"premium_cars_app/pkg/models"
+
 	"github.com/redis/go-redis/v9"
 )
 
@@ -17,18 +19,11 @@ type Queue struct {
 	rdb *redis.Client
 }
 
-type Request struct {
-	ID        string `json:"id"`
-	UserID    string `json:"user_id"`
-	CarModel  string `json:"car_model"`
-	CreatedAt string `json:"created_at"`
-}
-
 func NewQueue(rdb *redis.Client) *Queue {
 	return &Queue{rdb: rdb}
 }
 
-func (q *Queue) Enqueue(ctx context.Context, req *Request) error {
+func (q *Queue) Enqueue(ctx context.Context, req *models.Request) error {
 	data, err := json.Marshal(req)
 	if err != nil {
 		return err
@@ -43,13 +38,13 @@ func (q *Queue) GetStatus(ctx context.Context, id string) (string, error) {
 	return q.rdb.Get(ctx, StatusPrefix+id).Result()
 }
 
-func (q *Queue) Dequeue(ctx context.Context) (*Request, error) {
+func (q *Queue) Dequeue(ctx context.Context) (*models.Request, error) {
 	data, err := q.rdb.LPop(ctx, QueueKey).Result()
 	if err != nil {
 		return nil, err
 	}
 
-	var req Request
+	var req models.Request
 	if err := json.Unmarshal([]byte(data), &req); err != nil {
 		return nil, err
 	}

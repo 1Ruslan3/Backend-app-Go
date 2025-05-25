@@ -18,7 +18,6 @@ import (
 	"premium_cars_app/pkg/utils"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gorilla/mux"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -37,7 +36,7 @@ func main() {
 	if err != nil {
 		panic("failed to connect to PostgreSQL")
 	}
-	db.AutoMigrate(&models.User{})
+	db.AutoMigrate(&models.User{}, &models.Request{})
 
 	rdb := utils.NewRedisClient()
 	q := queue.NewQueue(rdb)
@@ -45,36 +44,30 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	w := consumer.Worker{Queue: q}
+	w := consumer.Worker{
+		Queue: q,
+		DB:    db,
+	}
 	go w.Start(ctx)
 
 	handler := &handlers.RequestHandler{Queue: q}
 
-	rr := mux.NewRouter()
-	rr.Use(mockAuthMiddleware)
-	rr.Use(requestTimeMiddleware)
-	rr.HandleFunc("/requests", handler.CreateRequest).Methods("POST")
-	rr.HandleFunc("/requests/{id}/status", handler.GetRequestStatus).Methods("GET")
-
 	r := gin.Default()
+
 	r.POST("/register", auth.Register(db))
 	r.POST("/login", auth.Login(db, rdb))
 
-	r.GET("/me", auth.AuthRequired(rdb), func(c *gin.Context) {
-		username, _ := c.Get("username")
-		c.JSON(http.StatusOK, gin.H{"user": username})
-	})
+	protected := r.Group("/")
+	protected.Use(auth.AuthRequired(rdb))
+	{
+		protected.GET("/me", func(c *gin.Context) {
+			username, _ := c.Get("username")
+			c.JSON(http.StatusOK, gin.H{"user": username})
+		})
 
-	r.Use(func(c *gin.Context) {
-		c.Set("userID", "user-123")
-		c.Set("requestTime", time.Now().Format(time.RFC3339))
-		c.Next()
-	})
-
-	r.Any("/requests", gin.WrapH(rr))
-	r.Any("/requests/*any", gin.WrapH(rr))
-	// r.POST("/requests", handler.CreateRequestGin)
-	// r.GET("/requests/:id/status", handler.GetRequestStatusGin)
+		protected.POST("/requests", handler.CreateRequestGin)
+		protected.GET("/requests/:id/status", handler.GetRequestStatusGin)
+	}
 
 	srv := &http.Server{
 		Addr:    ":8080",
@@ -102,22 +95,28 @@ func main() {
 		log.Fatalf("Server error: %v", err)
 	}
 
+	// r.GET("/me", auth.AuthRequired(rdb), func(c *gin.Context) {
+	// 	username, _ := c.Get("username")
+	// 	c.JSON(http.StatusOK, gin.H{"user": username})
+	// })
+
+	// rr := mux.NewRouter()
+	// rr.Use(mockAuthMiddleware)
+	// rr.Use(requestTimeMiddleware)
+	// rr.HandleFunc("/requests", handler.CreateRequest).Methods("POST")
+	// rr.HandleFunc("/requests/{id}/status", handler.GetRequestStatus).Methods("GET")
+
+	// r.Use(func(c *gin.Context) {
+	// 	c.Set("userID", "user-123")
+	// 	c.Set("requestTime", time.Now().Format(time.RFC3339))
+	// 	c.Next()
+	// })
+
+	// r.Any("/requests", gin.WrapH(rr))
+	// r.Any("/requests/*any", gin.WrapH(rr))
+	// r.POST("/requests", handler.CreateRequestGin)
+	// r.GET("/requests/:id/status", handler.GetRequestStatusGin)
+
 	// r.Run(":8080")
 
-}
-
-// Middleware для симуляции userID
-func mockAuthMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := context.WithValue(r.Context(), "userID", "user-123")
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
-
-// Middleware для добавления времени
-func requestTimeMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := context.WithValue(r.Context(), "requestTime", time.Now().Format(time.RFC3339))
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
 }
